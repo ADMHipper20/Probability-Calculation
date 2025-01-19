@@ -1,3 +1,4 @@
+#include <boost/math/special_functions/erf.hpp>
 #include <iostream>
 #include <string>
 #include <cstring>
@@ -6,6 +7,7 @@
 
 #define M_PI 3.14159265358979323846
 using namespace std;
+using namespace boost::math;
 
 int option;
 char text[8];
@@ -17,22 +19,6 @@ char text[8];
 //     return Combinationfact(n - 1, k - 1) + Combinationfact(n - 1, k);
 //     return n * Combinationfact(n - 1, 1) / (Combinationfact(stop, 1) * Combinationfact(n, n - stop));
 // }
-
-double erf_inv(double p) {
-    const double a1 =  0.254829592;
-    const double a2 = -0.284496736;
-    const double a3 =  1.421413741;
-    const double a4 = -1.453152027;
-    const double a5 =  1.061405429;
-    const double p_const = 0.3275911;
-
-    double sign = (p < 0) ? -1 : 1;
-    p = fabs(p);
-
-    double t = 1.0 / (1.0 + p_const * p);
-    double erf_approx = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * exp(-p * p);
-    return sign * erf_approx;
-}
 
 long double Combinationfact(int n, int k) {
     long double numerator = 1, denominator = 1;
@@ -134,6 +120,7 @@ void BinomialFunction(float probability) {
             cout << "Request Object To Find Probability: ";
             cin >> k;
 
+            CDF_Result = 0.0;
             for (int i = 0; i <= k; i++){
                 CDF_Result += Combinationfact(n, i) * pow(probability, i) * pow(1 - probability, n - i);
             }
@@ -497,14 +484,14 @@ void NormalDistFunction() {
     /* Friedrich Gauss (error theory), Abraham de Moivre (Central Limit Theorem)
        Pierre-Simon Laplace, Simeon Denis Poisson (Poisson's Distribution), Adolphe
        Quetelet the first Scientist of Sociolo  gy applying the Normal Distribution */
-    long double x, Z_value, Z, mean = 0.0, std_deviation = 0.0, variance, PDF, probability;
+    long double x, Z_value, mean = 0.0, std_deviation = 0.0, variance, PDF, probability;
 
     do {
         cout << "1. Probability Density Function" << endl;
         cout << "2. Transform to Normal Standard-Z Score" << endl;
         cout << "3. Calculate Z-value Area Under the Curve" << endl;
         cout << "4. Calculate X by Z-Value" << endl;
-        cout << "4. Mean and Variance" << endl;
+        cout << "5. Mean and Variance" << endl;
         cout << "Choose what to find: ";
         cin >> option;
 
@@ -566,18 +553,140 @@ void NormalDistFunction() {
             break;
         case 4:
             // Calculate X if known probability, using Mean and Variance
+            // Known as Inverse Gaussian Dist. or Wald Dist.
             cout << "Input the Probability (use dot if float): ";
             cin >> probability;
             cout << "Input the value of Mean and Std. Deviation: ";
             cin >> mean >> std_deviation;
 
             if (probability > 0 && probability < 1) {
-                Z_value = 2 * (2 / sqrt(2)) * erf_inv(2 * probability - 1);
+                // Z_value = (1 / sqrt(2*M_PI*pow(probability, 3))) * exp(-(pow((probability - 1), 2) / 2*probability)); Inverse?
+                Z_value = sqrt(2)*erf_inv(2 * probability - 1);
                 cout << "Z-value: " << Z_value << endl;
-                x = mean + Z_value * std_deviation;
+                x = mean + (Z_value * std_deviation);
             } else cout << "Probability must be between 0 and 1 (exclusive)." << endl;
 
             cout << "Result P(X <= " << probability << "): " << x << endl;
+            break;
+        default:
+            break;
+        }
+
+        cout << "Done? ";
+        cin.ignore();
+        cin.getline(text, sizeof(text));
+        system("cls");
+    } while ((strcmp("No", text) == 0 || strcmp("no", text) == 0));
+}
+
+void MarkovChain() {
+    int n, k, t, answer;
+    long double stateProbability[10][10], statePi[10], sum[10] = {};
+    
+    do {
+        cout << "1. Finding Matrixes Values" << endl;
+        cout << "2. Calculate Transitive Probability Matrixes" << endl;
+        cout << "Choose what to find: ";
+        cin >> option;
+
+        switch (option) {
+        case 1:
+            // Finding Value of first state matrix
+            cout << "Is there a Probability State(Pi) for next Periode? (1 for yes, other for no) ";
+            cin >> answer;
+
+            if (answer == 1) {
+                cout << "Input the size of State Probability Matrixes: ";
+                cin >> t;
+
+                cout << "Input the Value of Pi(t): ";
+                for (int i = 0; i < t; i++) {
+                    cin >> statePi[i];
+                }
+                
+                // Probability Matrixes given from Question
+                cout << "Input the size of Transitive Probability (row, then column): ";
+                cin >> k >> n;
+
+                cout << "Input the Value: ";
+                for (int i = 0; i < n; i++) {
+                    for (int j = 0; j < k; j++) {
+                        cin >> stateProbability[i][j];
+                    }
+                }
+            } else {
+                cout << "Input the size of Transitive Probability (row, then column): ";
+                cin >> k >> n;
+
+                for (int i = 0; i < n; i++) {
+                    for (int j = 0; j < k; j++) {
+                        cin >> stateProbability[i][j];
+                    }
+                }
+            }
+
+            break;
+        case 2:
+            // Calculate State Probability (pi) with Transitive Probability
+            if (answer == 1) {
+                cout << "State (pi): ";
+                for (int i = 0; i < n; i++) {
+                    for (int j = 0; j < k; j++) {
+                        sum[i] += (statePi[j] * stateProbability[j][i]);
+                    }
+                    cout << sum[i] << " ";
+                }
+
+                cout << endl;
+            } else {
+                cout << "Input the Value to predict each moment: ";
+                cin >> t;
+
+                long double tempMatrix[10][10], resultMatrix[10][10];
+
+                // Initialize resultMatrix as the identity matrix
+                for (int i = 0; i < n; i++) {
+                    for (int j = 0; j < k; j++) {
+                        resultMatrix[i][j] = (i == j) ? 1 : 0;
+                    }
+                }
+
+                for (int i = 0; i < n; i++) {
+                    for (int j = 0; j < k; j++) {
+                        tempMatrix[i][j] = stateProbability[i][j];
+                    }
+                }
+                
+                for (int step = 0; step < t; step++) {
+                    long double intermediateMatrix[10][10] = {};
+
+                    // Perform matrix multiplication: resultMatrix * tempMatrix
+                    for (int i = 0; i < n; i++) {
+                        for (int j = 0; j < k; j++) {
+                            for (int l = 0; l < k; l++) {
+                                intermediateMatrix[i][j] += resultMatrix[i][l] * tempMatrix[l][j];
+                            }
+                        }
+                    }
+
+                    // Update resultMatrix with the new values
+                    for (int i = 0; i < n; i++) {
+                        for (int j = 0; j < k; j++) {
+                            resultMatrix[i][j] = intermediateMatrix[i][j];
+                        }
+                    }
+                }
+
+                // Print the result matrix P^t
+                cout << "Probability Matrix after " << t << " step(s):" << endl;
+                for (int i = 0; i < n; i++) {
+                    for (int j = 0; j < k; j++) {
+                        cout << resultMatrix[i][j] << " ";
+                    }
+                    cout << endl;
+                }
+            }
+            
             break;
         default:
             break;
@@ -602,6 +711,7 @@ int main () {
         cout << "5. Uniform Distribution" << endl;
         cout << "6. Exponential Probability Distribution" << endl;
         cout << "7. Normal Distribution" << endl;
+        cout << "8. Markov's Chain" << endl;
         cout << "Insert one of the option: ";
         cin >> option;
         system("cls");
@@ -630,6 +740,9 @@ int main () {
             break;
         case 7:
             NormalDistFunction();
+            break;
+        case 8:
+            MarkovChain();
             break;
         default:
             break;
